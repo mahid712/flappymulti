@@ -424,7 +424,7 @@ let sendIntervalId = null;
 // safe wrapper to create a socket and attach handlers
 function connectSocket(){
     try{
-        socket = new WebSocket('ws://localhost:8080');
+        socket = new WebSocket('wss://flappymulti.onrender.com');
     }catch(e){
         socket = null;
         console.warn('WebSocket construct failed', e);
@@ -669,3 +669,4 @@ goHomeBtn.addEventListener('click', ()=>{ resetGame(); });
 </script>
 </body>
 </html>
+
