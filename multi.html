@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0" />
+<title>Flappy Bird — Premium UI (Multiplayer)</title>
+<style>
+:root{
+  --glass: rgba(255,255,255,0.08);
+  --glass-strong: rgba(255,255,255,0.12);
+  --accent: linear-gradient(135deg,#ffd166,#ff7b7b);
+  --shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Inter,system-ui,Arial,sans-serif}
+html,body{height:100%;background:linear-gradient(180deg,#0f172a 0%, #05668d 60%);overflow:hidden}
+#stage{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+canvas{border-radius:18px;box-shadow:var(--shadow);background: linear-gradient(180deg,#70c5ce 0%, #5fbad0 100%);display:block;touch-action:none;}
+#titleBar{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:12px;align-items:center;pointer-events:auto;}
+.btn{background: var(--accent);color: #111;padding:10px 20px;border-radius:12px;cursor:pointer;backdrop-filter: blur(6px);box-shadow: 0 10px 26px rgba(255,140,120,0.18);font-weight:600;border:none;}
+.overlay{position: absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:9998;pointer-events:auto;}
+#startUI, #gameOverUI{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;backdrop-filter: blur(10px);background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.45));color:white;text-align:center;}
+#titleLarge{font-size:72px;font-weight:900;letter-spacing:6px;text-shadow: 0 8px 30px rgba(0,0,0,0.6), 0 0 30px rgba(255,255,255,0.06);}
+#subtitle{font-size:18px;opacity:0.9;}
+#homeHighScore{font-size:18px;opacity:0.85;}
+#scoreLabel{position:absolute;top:110px;left:50%;transform:translateX(-50%);color:white;z-index:9998;font-weight:700;font-size:20px;text-shadow:0 6px 18px rgba(0,0,0,0.45);}
+#multiplayerStatus{position:fixed;top:20px;right:20px;color:white;font-weight:700;z-index:10000}
+@media (max-width:480px){
+  #titleLarge{font-size:44px}
+  .btn{padding:8px 10px}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="titleBar"></div>
+
+  <div id="scoreLabel">Score: <span id="scoreNum">0</span> | Bird Hit Points: <span id="enemyScore">0</span></div>
+  <div id="multiplayerStatus" style="display:none">Multiplayer: <span id="mpStatus">disconnected</span></div>
+
+  <canvas id="gameCanvas" width="400" height="600" aria-label="Flappy bird game"></canvas>
+
+  <div id="startUI" class="overlay" style="display:flex;">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:20px;">
+      <div id="titleLarge">FLAPPY BIRD</div>
+      <div id="subtitle">Premium UI • Modern Style • Responsive</div>
+      <div id="homeHighScore">High Score: <span id="homeHighScoreNum">0</span></div>
+      <div style="display:flex;gap:12px;">
+        <button id="startMainBtn" class="btn">Start Game</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px;">
+        <button id="createRoomBtn" class="btn">Create Room</button>
+        <button id="joinRoomBtn" class="btn">Join Room</button>
+      </div>
+      <div id="roomCodeDisplay" style="margin-top:8px;font-weight:700;opacity:0.95"></div>
+    </div>
+  </div>
+
+  <div id="gameOverUI" class="overlay" style="display:none;">
+    <div style="text-align:center;">
+      <div style="font-size:28px;font-weight:900">Game Over</div>
+      <div style="margin-top:8px">Your Score: <span id="finalScore">0</span></div>
+      <div style="margin-top:8px">High Score: <span id="finalHigh">0</span></div>
+      <div id="enemyHitPointsDisplay" style="margin-top:8px;font-size:18px"></div>
+      <div style="margin-top:12px;display:flex;gap:10px;justify-content:center">
+        <button id="playAgainBtn" class="btn">Play Again</button>
+        <button id="goHomeBtn" class="btn">Main Menu</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* -------------------------
+   YOUR ORIGINAL GAME (kept intact)
+   I copied your full game code below and then added multiplayer hooks after it.
+   No original logic was removed, only multiplayer additions appended and
+   a small opponent draw integrated safely so single-player still works alone.
+   ------------------------- */
+
+const internalW = 400, internalH = 600;
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+const startUI = document.getElementById('startUI'), gameOverUI = document.getElementById('gameOverUI');
+const startMainBtn = document.getElementById('startMainBtn'), playAgainBtn = document.getElementById('playAgainBtn'), goHomeBtn = document.getElementById('goHomeBtn');
+const scoreLabel = document.getElementById('scoreNum'), finalScore = document.getElementById('finalScore'), finalHigh = document.getElementById('finalHigh');
+const homeHighScoreNum = document.getElementById('homeHighScoreNum');
+const enemyScoreLabel = document.getElementById('enemyScore');
+
+let dpr = Math.max(1, window.devicePixelRatio || 1);
+
+const sndScore = new Audio("point.mp3"); 
+const sndHit   = new Audio("darshan.mp3");
+const sndFlap  = new Audio("flap.mp3");      // Flap sound
+const sndHitPipe = new Audio("hit.mp3");     // Hit sound before darshan.mp3
+let audioUnlocked = false;
+
+// Audio unlock
+function unlockAudio() {
+    if(!audioUnlocked){
+        sndScore.play().then(()=>sndScore.pause()).catch(()=>{});
+        sndFlap.play().then(()=>sndFlap.pause()).catch(()=>{});
+        sndHitPipe.play().then(()=>sndHitPipe.pause()).catch(()=>{});
+        audioUnlocked = true;
+        window.removeEventListener('pointerdown', unlockAudio);
+        window.removeEventListener('keydown', unlockAudio);
+    }
+}
+window.addEventListener('pointerdown', unlockAudio);
+window.addEventListener('keydown', unlockAudio);
+
+let gameStarted=false, gameOver=false;
+let waitingForFirstFlap = false;
+let GRAVITY=0.45, JUMP=-8.5;
+let bird={x:80,y:300,w:40,h:32,vy:0,rot:0,flapTimer:0};
+let pipes=[], enemies=[], frame=0, score=0, enemyScore=0;
+let framesSinceLastPipe=0;
+let nextPipeIn=100;
+let highScore=parseInt(localStorage.getItem('flappy_high')||'0',10);
+homeHighScoreNum.textContent=highScore;
+
+function resize(){
+    const padding = Math.min(window.innerWidth,24);
+    const maxW = window.innerWidth - padding;
+    const maxH = window.innerHeight - 80;
+    const targetRatio = internalW/internalH;
+    let cssW = maxW, cssH=Math.round(cssW/targetRatio);
+    if(cssH>maxH){ cssH=maxH; cssW=Math.round(cssH*targetRatio);}
+    canvas.style.width=cssW+'px'; canvas.style.height=cssH+'px';
+    dpr = Math.max(1, window.devicePixelRatio || 1);
+    canvas.width = internalW*dpr; canvas.height = internalH*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+
+const cloudsA=[], cloudsB=[];
+function spawnClouds(){
+  for(let i=0;i<6;i++) cloudsA.push({x:Math.random()*internalW,y:Math.random()*140,w:60+Math.random()*80,speed:0.2+Math.random()*0.3,alpha:0.12+Math.random()*0.15});
+  for(let i=0;i<4;i++) cloudsB.push({x:Math.random()*internalW,y:160+Math.random()*120,w:80+Math.random()*140,speed:0.35+Math.random()*0.4,alpha:0.06+Math.random()*0.08});
+}
+spawnClouds();
+
+function generatePipe(){
+    const gap = 150;
+    const topH=Math.random()*(internalH-gap-160)+50;
+    const bottomH=internalH-topH-gap;
+    const pipe={x:internalW+10, top:topH, bottom:bottomH, passed:false, w:50};
+    pipes.push(pipe);
+
+    const enemyChance = Math.random();
+    if(enemyChance < 0.7){
+        const enemyY=Math.random()<0.5 ? topH+10 : internalH-bottomH-24-10;
+        const isGolden = Math.random()<0.1; // 10% chance
+        enemies.push({x:pipe.x+10,y:enemyY,w:32,h:24,speed:3+Math.random()*1,verticalAmp:12+Math.random()*8,verticalFreq:0.05+Math.random()*0.05, golden:isGolden});
+    }
+
+    const cssWidth=parseInt(canvas.style.width||internalW,10);
+    const base = cssWidth<=360?140:100;
+    nextPipeIn = base+Math.floor(Math.random()*30);
+    framesSinceLastPipe=0;
+}
+
+function resetGame(){
+    gameStarted=false; gameOver=false; pipes=[]; enemies=[]; frame=0; score=0; enemyScore=0;
+    waitingForFirstFlap = false;
+    bird.x=80; bird.y=internalH/2; bird.vy=0; bird.rot=0; bird.flapTimer=0;
+    startUI.style.display='flex'; gameOverUI.style.display='none'; scoreLabel.parentElement.style.display='';
+    enemyScoreLabel.textContent = enemyScore;
+}
+
+function startGame(){
+    gameStarted = true;
+    gameOver = false;
+    waitingForFirstFlap = true;
+
+    startUI.style.display = 'none';
+    gameOverUI.style.display = 'none';
+    scoreLabel.parentElement.style.display = '';
+
+    pipes = [];
+    enemies = [];
+    frame = 0;
+    score = 0;
+    enemyScore = 0;
+    enemyScoreLabel.textContent = enemyScore;
+
+    bird.y = internalH/2;
+    bird.vy = 0;
+    bird.rot = 0;
+    framesSinceLastPipe = 0;
+}
+
+function flap(){
+    if(!gameStarted) startGame();
+
+    if(waitingForFirstFlap) waitingForFirstFlap = false;
+
+    if(!gameOver && gameStarted){
+        bird.vy = JUMP;
+        bird.flapTimer=6;
+        if(audioUnlocked){ sndFlap.currentTime = 0; sndFlap.play().catch(()=>{}); }
+    }
+    if(gameOver) startGame();
+}
+
+document.addEventListener('keydown', e=>{if(e.code==='Space'||e.key===' '){e.preventDefault(); flap();}});
+canvas.addEventListener('pointerdown', e=>{e.preventDefault(); flap();},{passive:false});
+
+// ---------- FULL showGameOver function ----------
+function showGameOver(){
+  if(score>highScore){highScore=score; localStorage.setItem('flappy_high',highScore);}
+  finalScore.textContent = score;
+  finalHigh.textContent = highScore;
+  homeHighScoreNum.textContent = highScore;
+
+  // Remove existing hit points display if it exists
+  const existingHit = gameOverUI.querySelector('#enemyHitPointsDisplay');
+  if(existingHit) existingHit.remove();
+
+  // Add enemy bird hit points display above buttons
+  const enemyHitPointsDisplay = document.createElement('div');
+  enemyHitPointsDisplay.id = 'enemyHitPointsDisplay';
+  enemyHitPointsDisplay.style.marginTop = '8px';
+  enemyHitPointsDisplay.style.fontSize = '18px';
+  enemyHitPointsDisplay.textContent = "Bird Hit Points: " + enemyScore;
+
+  // Get the container that holds the buttons
+  const buttonContainer = gameOverUI.querySelector('div > div[style*="display:flex;gap:10px"]');
+  buttonContainer.parentElement.insertBefore(enemyHitPointsDisplay, buttonContainer);
+
+  gameOverUI.style.display='flex'; 
+  scoreLabel.parentElement.style.display='none';
+  
+  try{ 
+      if(audioUnlocked){ sndHitPipe.currentTime=0; sndHitPipe.play().catch(()=>{}); }
+      sndHit.currentTime=0; sndHit.play(); 
+  }catch(e){}
+}
+
+
+// ---------- UPDATE FUNCTION ----------
+function update(dt){
+    frame++;
+
+    cloudsA.forEach(c=>{c.x-=c.speed*dt;if(c.x<-200)c.x=internalW+200;});
+    cloudsB.forEach(c=>{c.x-=c.speed*dt;if(c.x<-300)c.x=internalW+300;});
+
+    if(!gameStarted || gameOver || waitingForFirstFlap){
+        bird.flapTimer=Math.max(0,bird.flapTimer-dt);
+        bird.vy = Math.sin(frame*0.15) * 1.2;
+        bird.y += bird.vy * dt;
+        bird.rot = Math.sin(frame*0.12) * 0.25;
+        return;
+    }
+
+    bird.vy+=GRAVITY*dt; bird.y+=bird.vy*dt; bird.rot=Math.max(-0.6,Math.min(0.9,bird.vy*0.06));
+
+    framesSinceLastPipe++;
+    if(framesSinceLastPipe>=nextPipeIn) generatePipe();
+
+    for(let i=pipes.length-1;i>=0;i--){
+        const p=pipes[i]; p.x-=2.6*dt;
+        if(!p.passed && p.x+p.w<bird.x){
+            p.passed=true; score++; scoreLabel.textContent=score;
+            if(audioUnlocked){ sndScore.currentTime=0; sndScore.play().catch(()=>{}); }
+        }
+        if(p.x<-80)pipes.splice(i,1);
+    }
+
+    for(let i=enemies.length-1;i>=0;i--){
+        const e=enemies[i]; 
+        e.x-=e.speed*dt; 
+        e.y+=Math.sin(frame*e.verticalFreq+i)*e.verticalAmp*dt*0.1;
+
+        if(bird.x<e.x+e.w && bird.x+bird.w>e.x && bird.y<e.y+e.h && bird.y+bird.h>e.y){
+            // ⭐ Increase enemy points and remove enemy
+            enemyScore += e.golden ? 50 : 10;
+            enemyScoreLabel.textContent = enemyScore;
+            enemies.splice(i,1);
+            continue;
+        }
+
+        if(e.x<-80) enemies.splice(i,1);
+    }
+
+    for(const p of pipes){
+        if(bird.x<p.x+p.w && bird.x+bird.w>p.x){
+            if(bird.y<p.top||bird.y+bird.h>internalH-p.bottom){
+                gameOver=true; gameStarted=false; showGameOver();
+            }
+        }
+    }
+
+    if(bird.y+bird.h>=internalH || bird.y<=0){
+        gameOver=true; gameStarted=false; showGameOver();
+    }
+}
+
+// -------------------- DRAW FUNCTIONS -----------------------
+function drawBird(cx,cy,w,h,rot){
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(rot);
+    ctx.beginPath(); ctx.ellipse(0,0,w*0.45,h*0.5,0,0,Math.PI*2); ctx.fillStyle='#ffd54a'; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-w*0.05,0,w*0.35,h*0.35,0,0,Math.PI*2); ctx.fillStyle='#fff0d6'; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-w*0.02,h*0.05,w*0.25,h*0.12,-0.6,0,Math.PI*2); ctx.fillStyle='#ffb733'; ctx.fill();
+    ctx.beginPath(); ctx.arc(w*0.18,-h*0.08,w*0.07,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(w*0.36,0); ctx.lineTo(w*0.58,-h*0.08); ctx.lineTo(w*0.58,h*0.08); ctx.closePath(); ctx.fillStyle='#f39c12'; ctx.fill();
+    ctx.restore();
+}
+
+// Enemy draw function
+function drawEnemy(e){
+    ctx.save();
+    ctx.translate(e.x + e.w * 0.5, e.y + e.h * 0.5);
+    ctx.scale(-1, 1);
+    ctx.rotate(Math.sin((e.x + e.y) * 0.01) * 0.1);
+    const scale = 0.75;
+    const flap = Math.sin(frame * 0.3 + e.x*0.05) * 0.4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, (bird.w * 0.45) * scale, (bird.h * 0.5) * scale, 0, 0, Math.PI*2);
+    ctx.fillStyle = e.golden ? '#ffd700' : '#ff0000';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(-bird.w*0.05*scale, 0, bird.w*0.35*scale, bird.h*0.35*scale, 0, 0, Math.PI*2);
+    ctx.fillStyle = e.golden ? '#fff8dc' : '#ff6666';
+    ctx.fill();
+    ctx.save();
+    ctx.translate(-bird.w*0.02*scale, bird.h*0.05*scale);
+    ctx.rotate(flap);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, bird.w*0.25*scale, bird.h*0.12*scale, -0.6, 0, Math.PI*2);
+    ctx.fillStyle = e.golden ? '#ffdd33' : '#cc0000';
+    ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(bird.w*0.18*scale, -bird.h*0.08*scale, bird.w*0.07*scale, 0, Math.PI*2);
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(bird.w*0.36*scale,0);
+    ctx.lineTo(bird.w*0.58*scale,-bird.h*0.08*scale);
+    ctx.lineTo(bird.w*0.58*scale,bird.h*0.08*scale);
+    ctx.closePath();
+    ctx.fillStyle = e.golden ? '#ffcc00' : '#ff9900';
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawCloud(x,y,w){
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.ellipse(x,y,w*0.7,w*0.4,0,0,Math.PI*2);
+    ctx.ellipse(x+w*0.35,y+6,w*0.5,w*0.3,0,0,Math.PI*2);
+    ctx.ellipse(x-w*0.35,y+6,w*0.5,w*0.3,0,0,Math.PI*2);
+    ctx.fill();
+}
+
+function drawPipe(x,y,w,h,isTop){
+    const grad=ctx.createLinearGradient(x,y,x,y+h);
+    grad.addColorStop(0,'#0a6b3a'); grad.addColorStop(1,'#0a8d4a');
+    ctx.fillStyle=grad; ctx.fillRect(x,y,w,h);
+    ctx.fillStyle='#8be6a4';
+    const rimH=8;
+    if(isTop) ctx.fillRect(x-2,y+h-rimH,w+4,rimH);
+    else ctx.fillRect(x-2,y-rimH,w+4,rimH);
+    ctx.fillStyle='rgba(0,0,0,0.12)';
+    ctx.fillRect(x+w-8,y+4,8,h-8);
+}
+
+function draw(){
+    const g=ctx.createLinearGradient(0,0,0,internalH);
+    g.addColorStop(0,'#70c5ce');
+    g.addColorStop(1,'#4fb0c8');
+    ctx.fillStyle=g; ctx.fillRect(0,0,internalW,internalH);
+
+    cloudsA.forEach(c=>{ctx.globalAlpha=c.alpha; drawCloud(c.x,c.y,c.w);});
+    cloudsB.forEach(c=>{ctx.globalAlpha=c.alpha*0.9; drawCloud(c.x,c.y,c.w*1.4);});
+    ctx.globalAlpha=1;
+
+    ctx.fillStyle='#2d6b7a'; ctx.fillRect(0,internalH-32,internalW,32);
+
+    for(const p of pipes) drawPipe(p.x,0,p.w,p.top,true), drawPipe(p.x,internalH-p.bottom,p.w,p.bottom,false);
+    for(const e of enemies) drawEnemy(e);
+
+    // Draw opponent if connected
+    if(opponent && opponent.connected){
+        // draw opponent bird slightly translucent
+        ctx.save();
+        ctx.globalAlpha = 0.95;
+        drawBird(opponent.x + opponent.w*0.5, opponent.y + opponent.h*0.5, opponent.w, opponent.h, opponent.rot);
+        // small label
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    ctx.save(); ctx.translate(bird.x+bird.w*0.5,bird.y+bird.h*0.5); ctx.rotate(bird.rot);
+    ctx.globalAlpha=0.12;
+    ctx.beginPath(); ctx.ellipse(0,36,bird.w*0.7,8,0,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+    ctx.globalAlpha=1; ctx.restore();
+
+    drawBird(bird.x+bird.w*0.5,bird.y+bird.h*0.5,bird.w,bird.h,bird.rot);
+}
+
+/* -------------------------
+   End of original game code
+   ------------------------- */
+
+/* -------------------------
+   Multiplayer client code (hooks + safe checks)
+   ------------------------- */
+
+// Opponent object to render other player's bird and stats
+let opponent = {connected:false, x:80, y:300, w:40, h:32, rot:0, score:0, enemyScore:0, alive:true};
+
+// UI elements for multiplayer status & room display
+const mpStatusEl = document.getElementById('mpStatus');
+const mpPanel = document.getElementById('multiplayerStatus');
+const roomDisplay = document.getElementById('roomCodeDisplay');
+
+let socket = null;
+let clientId = null;
+let roomCode = null;
+let isOwner = false;
+let sendIntervalId = null;
+
+// safe wrapper to create a socket and attach handlers
+function connectSocket(){
+    try{
+        socket = new WebSocket('ws://localhost:8080');
+    }catch(e){
+        socket = null;
+        console.warn('WebSocket construct failed', e);
+        return;
+    }
+
+    socket.addEventListener('open', ()=>{
+        console.log('Connected to WebSocket server');
+        mpPanel.style.display = 'block';
+        mpStatusEl.textContent = 'connected';
+    });
+
+    socket.addEventListener('message', (ev)=>{
+        let data;
+        try{ data = JSON.parse(ev.data); }catch(e){ return; }
+
+        // handle server messages
+        if(data.type === 'roomCreated'){
+            roomCode = data.code;
+            isOwner = true;
+            roomDisplay.textContent = 'Room: ' + roomCode + ' (owner)';
+            // owner shouldn't start until someone joins
+            startMainBtn.disabled = true;
+        }
+
+        if(data.type === 'playerJoined'){
+            // other player joined the owner's room
+            if(isOwner){
+                startMainBtn.disabled = false;
+                roomDisplay.textContent = 'Room: ' + roomCode + ' (player joined)';
+                alert('Player joined your room — you can now start multiplayer.');
+            }
+        }
+
+        if(data.type === 'startGame'){
+            // server instructs to start
+            startUI.style.display = 'none';
+            startGame();
+        }
+
+        if(data.type === 'roomJoined'){
+            // joined successfully
+            roomCode = data.code;
+            roomDisplay.textContent = 'Room: ' + roomCode + ' (joined)';
+            // joined player can start (we enable start for joined)
+            startMainBtn.disabled = false;
+        }
+
+        if(data.type === 'opponentUpdate'){
+    const s = data.state || {};
+    opponent.connected = true;
+    opponent.x = (typeof s.x === 'number') ? s.x : opponent.x;
+    opponent.y = (typeof s.y === 'number') ? s.y : opponent.y;
+    opponent.rot = (typeof s.rot === 'number') ? s.rot : opponent.rot;
+    opponent.score = (typeof s.score === 'number') ? s.score : opponent.score;
+    opponent.enemyScore = (typeof s.enemyScore === 'number') ? s.enemyScore : opponent.enemyScore;
+    opponent.alive = (typeof s.alive === 'boolean') ? s.alive : opponent.alive;
+
+    // NEW: show game over only when both players are dead
+    if(!opponent.alive && gameOver) {
+        displayMultiplayerGameOver();
+    }
+}
+        if(data.type === 'opponentLeft'){
+            opponent.connected = false;
+            opponent.alive = false;
+            roomDisplay.textContent = 'Room: ' + (roomCode || '') + ' (opponent left)';
+            alert('Opponent left the room.');
+        }
+
+        if(data.type === 'error'){
+            alert('Server: ' + (data.message||'error'));
+        }
+    });
+
+    socket.addEventListener('close', ()=>{
+        console.log('Socket closed');
+        mpStatusEl.textContent = 'disconnected';
+        opponent.connected = false;
+        if(sendIntervalId) { clearInterval(sendIntervalId); sendIntervalId = null; }
+    });
+
+    socket.addEventListener('error', (e)=>{
+        console.warn('Socket error', e);
+        mpStatusEl.textContent = 'error';
+    });
+}
+
+// send our state to server (throttle to ~10 times/sec)
+function startSendingState(){
+    if(!socket || socket.readyState !== WebSocket.OPEN) return;
+    if(sendIntervalId) clearInterval(sendIntervalId);
+    sendIntervalId = setInterval(()=>{
+        if(!socket || socket.readyState !== WebSocket.OPEN) return;
+        const state = {
+            type: 'playerUpdate',
+            state: {
+                x: bird.x,
+                y: bird.y,
+                rot: bird.rot,
+                score: score,
+                enemyScore: enemyScore,
+                alive: !gameOver
+            },
+            code: roomCode || null
+        };
+        try{ socket.send(JSON.stringify(state)); }catch(e){}
+    }, 100); // 100ms
+}
+
+// Stop sending (cleanup)
+function stopSendingState(){
+    if(sendIntervalId) { clearInterval(sendIntervalId); sendIntervalId = null; }
+}
+
+// create room button
+document.getElementById('createRoomBtn').addEventListener('click', ()=>{
+    if(!socket || socket.readyState !== WebSocket.OPEN){
+        connectSocket();
+        // wait briefly for open before sending create; fallback: attempt send after open
+        socket.addEventListener('open', ()=>{ try{ socket.send(JSON.stringify({type:'createRoom'})); }catch(e){} }, {once:true});
+    }else{
+        try{ socket.send(JSON.stringify({type:'createRoom'})); }catch(e){}
+    }
+});
+
+// join room button
+document.getElementById('joinRoomBtn').addEventListener('click', ()=>{
+    const code = prompt('Enter room code:');
+    if(!code) return;
+    if(!socket || socket.readyState !== WebSocket.OPEN){
+        connectSocket();
+        socket.addEventListener('open', ()=>{ try{ socket.send(JSON.stringify({type:'joinRoom', code})); }catch(e){} }, {once:true});
+    }else{
+        try{ socket.send(JSON.stringify({type:'joinRoom', code})); }catch(e){}
+    }
+});
+
+// start button override to support multiplayer start messaging
+startMainBtn.addEventListener('click', ()=>{
+    // if connected and in a room, send start request to server; otherwise local start
+    if(socket && socket.readyState === WebSocket.OPEN && roomCode){
+        try{ socket.send(JSON.stringify({type:'startGame', code: roomCode})); }catch(e){}
+    } else {
+        startGame();
+    }
+});
+
+// When we actually start (either via startGame or server), begin sending state
+// We'll hook into the startGame function behavior by wrapping startGame with a small helper:
+const originalStartGame = startGame;
+startGame = function(){
+    originalStartGame();
+    // if connected to server and in a room, start sending our state
+    if(socket && socket.readyState === WebSocket.OPEN && roomCode){
+        startSendingState();
+    }
+};
+
+// When game over, send one final state (alive=false) then stop sending
+// -------------------- Multiplayer sync for both players dying --------------------
+let pendingGameOver = false; // true if we died but waiting for opponent
+
+const originalShowGameOver = showGameOver;
+showGameOver = function(){
+    if(socket && socket.readyState === WebSocket.OPEN && roomCode && opponent.connected){
+        // Send our alive=false state to server
+        try{
+            socket.send(JSON.stringify({
+                type:'playerUpdate',
+                state:{alive:false, score:score, enemyScore:enemyScore},
+                code:roomCode
+            }));
+        }catch(e){}
+        stopSendingState();
+
+        // Mark that we're waiting for opponent if they are still alive
+        if(opponent.alive){
+            pendingGameOver = true;
+            return; // don't show UI yet
+        }
+    }
+
+    // If opponent already dead or single-player, show immediately
+    originalShowGameOver();
+
+    // Show both scores if multiplayer
+    if(opponent.connected){
+        const enemyHitPointsDisplay = gameOverUI.querySelector('#enemyHitPointsDisplay');
+        if(enemyHitPointsDisplay){
+            enemyHitPointsDisplay.textContent = `Opponent Score: ${opponent.score}`;
+        }
+    }
+};
+
+// Also, when leaving (click Main Menu), tell server we're leaving the room
+goHomeBtn.addEventListener('click', ()=>{
+    if(socket && socket.readyState === WebSocket.OPEN && roomCode){
+        try{ socket.send(JSON.stringify({type:'leaveRoom', code: roomCode})); }catch(e){}
+    }
+});
+
+// When page unload, close socket
+window.addEventListener('beforeunload', ()=>{
+    try{ if(socket) socket.close(); }catch(e){}
+});
+
+/* -------------------------
+  NOTES about server protocol (for your server)
+  - createRoom -> server responds {type:'roomCreated', code}
+  - joinRoom -> server responds {type:'roomJoined', code} or {type:'error', message}
+  - when second player joins, server should broadcast {type:'playerJoined'} to owner
+  - startGame -> server should broadcast {type:'startGame'} to both participants
+  - playerUpdate -> client sends {type:'playerUpdate', state:{x,y,rot,score,enemyScore,alive}, code}
+        server should forward {type:'opponentUpdate', state:...} to the other player
+  - leaveRoom -> server notifies the other player {type:'opponentLeft'}
+  ------------------------- */
+
+/* -------------------------
+   Frame loop + start game initialization (already present earlier)
+   We already attached original listeners earlier; ensure resize/reset/loop run
+   ------------------------- */
+
+let lastTime = performance.now();
+function frameLoop(time){
+    let rawMs = time - lastTime;
+    lastTime = time;
+    let dt = rawMs / 16.666;
+    dt = Math.min(dt, 4);
+    update(dt);
+    draw();
+    requestAnimationFrame(frameLoop);
+}
+requestAnimationFrame(frameLoop);
+
+resize(); resetGame();
+
+// Keep original playAgain and goHome behaviors intact (already set earlier)
+playAgainBtn.addEventListener('click', ()=>{ startGame(); });
+goHomeBtn.addEventListener('click', ()=>{ resetGame(); });
+
+</script>
+</body>
+</html>
