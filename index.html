@@ -16,7 +16,11 @@ html,body{height:100%;background:linear-gradient(180deg,#0f172a 0%, #05668d 60%)
 #stage{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
 canvas{border-radius:18px;box-shadow:var(--shadow);background: linear-gradient(180deg,#70c5ce 0%, #5fbad0 100%);display:block;touch-action:none;}
 #titleBar{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:12px;align-items:center;pointer-events:auto;}
-.btn{background: var(--accent);color: #111;padding:10px 20px;border-radius:12px;cursor:pointer;backdrop-filter: blur(6px);box-shadow: 0 10px 26px rgba(255,140,120,0.18);font-weight:600;border:none;}
+.btn{background: var(--accent);color: #111;padding:10px 20px;border-radius:12px;cursor:pointer;backdrop-filter: blur(6px);box-shadow: 0 10px 26px rgba(255,140,120,0.18);font-weight:600;border:none;transition: transform 0.1s, box-shadow 0.1s;}
+.btn:hover:not(:disabled){transform: translateY(-2px);box-shadow: 0 12px 28px rgba(255,140,120,0.25);}
+.btn:active:not(:disabled){transform: translateY(0);box-shadow: 0 10px 26px rgba(255,140,120,0.18);}
+.btn:disabled{opacity: 0.6; cursor: not-allowed; filter: grayscale(100%);}
+
 .overlay{position: absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:9998;pointer-events:auto;}
 #startUI, #gameOverUI{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;backdrop-filter: blur(10px);background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.45));color:white;text-align:center;}
 #titleLarge{font-size:72px;font-weight:900;letter-spacing:6px;text-shadow: 0 8px 30px rgba(0,0,0,0.6), 0 0 30px rgba(255,255,255,0.06);}
@@ -24,6 +28,67 @@ canvas{border-radius:18px;box-shadow:var(--shadow);background: linear-gradient(1
 #homeHighScore{font-size:18px;opacity:0.85;}
 #scoreLabel{position:absolute;top:110px;left:50%;transform:translateX(-50%);color:white;z-index:9998;font-weight:700;font-size:20px;text-shadow:0 6px 18px rgba(0,0,0,0.45);}
 #multiplayerStatus{position:fixed;top:20px;right:20px;color:white;font-weight:700;z-index:10000}
+
+/* New Debug Panel Style */
+#debugPanel {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #ffcc00;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    z-index: 10000;
+    display: none; /* Hidden by default, shown when MP connected */
+    font-family: monospace;
+}
+.score-box {
+    margin-top: 15px;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 320px;
+    text-align: left;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.score-box h3 {
+    text-align: center;
+    font-size: 20px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+.score-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.score-line:last-child { border-bottom: none; }
+#winnerMessage {
+    font-size: 28px;
+    font-weight: 900;
+    margin: 15px 0 20px 0;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    color: #ffcc00; /* Gold color for winner */
+}
+#waitingMessage {
+    font-size: 20px;
+    font-weight: 500;
+    color: #fff;
+    margin-top: 20px;
+}
+#roomCodeInput {
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    width: 200px;
+    color: #111;
+    font-weight: 500;
+    text-align: center;
+}
 @media (max-width:480px){
   #titleLarge{font-size:44px}
   .btn{padding:8px 10px}
@@ -36,32 +101,65 @@ canvas{border-radius:18px;box-shadow:var(--shadow);background: linear-gradient(1
 
   <div id="scoreLabel">Score: <span id="scoreNum">0</span> | Bird Hit Points: <span id="enemyScore">0</span></div>
   <div id="multiplayerStatus" style="display:none">Multiplayer: <span id="mpStatus">disconnected</span></div>
+  
+  <div id="debugPanel" style="display:none;">
+    MP Debug Status:<br>
+    GO: <span id="debugGO">false</span><br>
+    Pending: <span id="debugPending">false</span><br>
+    Opp Alive: <span id="debugOppAlive">false</span><br>
+    Opp Connected: <span id="debugOppConnected">false</span>
+  </div>
 
   <canvas id="gameCanvas" width="400" height="600" aria-label="Flappy bird game"></canvas>
 
   <div id="startUI" class="overlay" style="display:flex;">
     <div style="display:flex;flex-direction:column;align-items:center;gap:20px;">
       <div id="titleLarge">FLAPPY BIRD</div>
-      <div id="subtitle">Premium UI • Modern Style • Responsive</div>
+      <div id="subtitle">Premium UI • Competitive Multiplayer</div>
       <div id="homeHighScore">High Score: <span id="homeHighScoreNum">0</span></div>
-      <div style="display:flex;gap:12px;">
-        <button id="startMainBtn" class="btn">Start Game</button>
+      
+      <div id="mainMenuButtons" style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+        <div style="display:flex;gap:12px;">
+            <button id="startMainBtn" class="btn">Start Local Game</button>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:10px;">
+            <button id="createRoomBtn" class="btn">Create Room</button>
+            <button id="joinRoomBtn" class="btn">Join Room</button>
+        </div>
       </div>
-      <div style="display:flex;gap:10px;margin-top:10px;">
-        <button id="createRoomBtn" class="btn">Create Room</button>
-        <button id="joinRoomBtn" class="btn">Join Room</button>
+      
+      <div id="joinRoomContainer" style="display:none; flex-direction:column; gap:10px; align-items:center; margin-top:10px; padding: 15px; background: var(--glass-strong); border-radius: 12px;">
+        <input type="text" id="roomCodeInput" placeholder="Enter Room Code (e.g., A1B2)" maxlength="4" style="text-transform: uppercase;">
+        <button id="submitJoinBtn" class="btn" style="background: linear-gradient(135deg,#00b4d8,#0077b6); color:white; padding: 10px 20px;">Join Game</button>
+        <button id="cancelJoinBtn" class="btn" style="background: #6c757d; color:white; padding: 8px 15px;">Cancel</button>
       </div>
+
       <div id="roomCodeDisplay" style="margin-top:8px;font-weight:700;opacity:0.95"></div>
     </div>
   </div>
 
   <div id="gameOverUI" class="overlay" style="display:none;">
-    <div style="text-align:center;">
-      <div style="font-size:28px;font-weight:900">Game Over</div>
-      <div style="margin-top:8px">Your Score: <span id="finalScore">0</span></div>
-      <div style="margin-top:8px">High Score: <span id="finalHigh">0</span></div>
-      <div id="enemyHitPointsDisplay" style="margin-top:8px;font-size:18px"></div>
-      <div style="margin-top:12px;display:flex;gap:10px;justify-content:center">
+    <div style="text-align:center; display:flex; flex-direction:column; align-items:center; padding: 20px;">
+      <div style="font-size:40px;font-weight:900">Game Over</div>
+      <div id="winnerMessage" style="display:none;"></div>
+      <div id="waitingMessage" style="display:none;">Waiting for opponent to finish...</div>
+
+      <div id="multiplayerResultContainer" style="display:flex; gap: 20px; justify-content:center; flex-wrap: wrap;">
+        <div class="score-box">
+          <h3>Your Results</h3>
+          <div class="score-line"><span>Pipe Score:</span> <span id="finalScore">0</span></div>
+          <div class="score-line"><span>High Score:</span> <span id="finalHigh">0</span></div>
+          <div class="score-line"><span>Hit Points:</span> <span id="finalEnemyScore">0</span></div>
+        </div>
+
+        <div id="opponentResultBox" class="score-box" style="display:none;">
+          <h3>Opponent Results</h3>
+          <div class="score-line"><span>Pipe Score:</span> <span id="opponentFinalScore">0</span></div>
+          <div class="score-line"><span>Hit Points:</span> <span id="opponentFinalEnemyScore">0</span></div>
+        </div>
+      </div>
+
+      <div style="margin-top:25px;display:flex;gap:10px;justify-content:center">
         <button id="playAgainBtn" class="btn">Play Again</button>
         <button id="goHomeBtn" class="btn">Main Menu</button>
       </div>
@@ -70,44 +168,45 @@ canvas{border-radius:18px;box-shadow:var(--shadow);background: linear-gradient(1
 </div>
 
 <script>
-/* -------------------------
-   YOUR ORIGINAL GAME (kept intact)
-   I copied your full game code below and then added multiplayer hooks after it.
-   No original logic was removed, only multiplayer additions appended and
-   a small opponent draw integrated safely so single-player still works alone.
-   ------------------------- */
-
 const internalW = 400, internalH = 600;
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d', { alpha: false });
 
 const startUI = document.getElementById('startUI'), gameOverUI = document.getElementById('gameOverUI');
 const startMainBtn = document.getElementById('startMainBtn'), playAgainBtn = document.getElementById('playAgainBtn'), goHomeBtn = document.getElementById('goHomeBtn');
-const scoreLabel = document.getElementById('scoreNum'), finalScore = document.getElementById('finalScore'), finalHigh = document.getElementById('finalHigh');
-const homeHighScoreNum = document.getElementById('homeHighScoreNum');
-const enemyScoreLabel = document.getElementById('enemyScore');
+const scoreLabel = document.getElementById('scoreNum'), enemyScoreLabel = document.getElementById('enemyScore');
+
+// Game Over UI placeholders
+const finalScoreEl = document.getElementById('finalScore'), finalHighEl = document.getElementById('finalHigh');
+const finalEnemyScoreEl = document.getElementById('finalEnemyScore');
+const opponentResultBox = document.getElementById('opponentResultBox');
+const opponentFinalScoreEl = document.getElementById('opponentFinalScore');
+const opponentFinalEnemyScoreEl = document.getElementById('opponentFinalEnemyScore');
+const winnerMessageEl = document.getElementById('winnerMessage');
+const waitingMessageEl = document.getElementById('waitingMessage');
+
+// Debug UI
+const debugPanel = document.getElementById('debugPanel');
+const debugGO = document.getElementById('debugGO');
+const debugPending = document.getElementById('debugPending');
+const debugOppAlive = document.getElementById('debugOppAlive');
+const debugOppConnected = document.getElementById('debugOppConnected');
+
+
+// New UI elements for joining room
+const mainMenuButtons = document.getElementById('mainMenuButtons');
+const joinRoomContainer = document.getElementById('joinRoomContainer');
+const roomCodeInput = document.getElementById('roomCodeInput');
+const submitJoinBtn = document.getElementById('submitJoinBtn');
+const cancelJoinBtn = document.getElementById('cancelJoinBtn');
 
 let dpr = Math.max(1, window.devicePixelRatio || 1);
 
-const sndScore = new Audio("point.mp3"); 
-const sndHit   = new Audio("darshan.mp3");
-const sndFlap  = new Audio("flap.mp3");      // Flap sound
-const sndHitPipe = new Audio("hit.mp3");     // Hit sound before darshan.mp3
-let audioUnlocked = false;
-
-// Audio unlock
-function unlockAudio() {
-    if(!audioUnlocked){
-        sndScore.play().then(()=>sndScore.pause()).catch(()=>{});
-        sndFlap.play().then(()=>sndFlap.pause()).catch(()=>{});
-        sndHitPipe.play().then(()=>sndHitPipe.pause()).catch(()=>{});
-        audioUnlocked = true;
-        window.removeEventListener('pointerdown', unlockAudio);
-        window.removeEventListener('keydown', unlockAudio);
-    }
-}
-window.addEventListener('pointerdown', unlockAudio);
-window.addEventListener('keydown', unlockAudio);
+const sndScore = new Audio("point.mp3");
+const sndHit = new Audio("darshan.mp3");
+const sndFlap = new Audio("flap.mp3");
+const sndHitPipe = new Audio("hit.mp3");
+let audioUnlocked = true; 
 
 let gameStarted=false, gameOver=false;
 let waitingForFirstFlap = false;
@@ -135,8 +234,8 @@ window.addEventListener('resize', resize);
 
 const cloudsA=[], cloudsB=[];
 function spawnClouds(){
-  for(let i=0;i<6;i++) cloudsA.push({x:Math.random()*internalW,y:Math.random()*140,w:60+Math.random()*80,speed:0.2+Math.random()*0.3,alpha:0.12+Math.random()*0.15});
-  for(let i=0;i<4;i++) cloudsB.push({x:Math.random()*internalW,y:160+Math.random()*120,w:80+Math.random()*140,speed:0.35+Math.random()*0.4,alpha:0.06+Math.random()*0.08});
+    for(let i=0;i<6;i++) cloudsA.push({x:Math.random()*internalW,y:Math.random()*140,w:60+Math.random()*80,speed:0.2+Math.random()*0.3,alpha:0.12+Math.random()*0.15});
+    for(let i=0;i<4;i++) cloudsB.push({x:Math.random()*internalW,y:160+Math.random()*120,w:80+Math.random()*140,speed:0.35+Math.random()*0.4,alpha:0.06+Math.random()*0.08});
 }
 spawnClouds();
 
@@ -163,15 +262,46 @@ function generatePipe(){
 function resetGame(){
     gameStarted=false; gameOver=false; pipes=[]; enemies=[]; frame=0; score=0; enemyScore=0;
     waitingForFirstFlap = false;
-    bird.x=80; bird.y=internalH/2; bird.vy=0; bird.rot=0; bird.flapTimer=0;
+    pendingGameOver = false; // Reset the waiting flag
+    
+    // IMPORTANT: Ensure bird position is reset before showing the menu
+    bird.x=80; bird.y=internalH/2; bird.vy=0; bird.rot=0; bird.flapTimer=0; 
+    
     startUI.style.display='flex'; gameOverUI.style.display='none'; scoreLabel.parentElement.style.display='';
     enemyScoreLabel.textContent = enemyScore;
+    
+    // Reset multiplayer state in UI
+    roomCode = null;
+    isOwner = false;
+    // Set opponent's initial X position off-screen
+    opponent = {connected:false, x:-100, y:300, w:40, h:32, rot:0, score:0, enemyScore:0, alive:true};
+    roomDisplay.textContent = '';
+    startMainBtn.disabled = false;
+    winnerMessageEl.style.display = 'none';
+    opponentResultBox.style.display = 'none';
+    waitingMessageEl.style.display = 'none';
+    
+    // ⭐ FIX: Ensure Play Again is re-enabled on reset, it will be disabled again 
+    // in startGame() for MP games. This fixes local game restarts.
+    playAgainBtn.disabled = false; 
+    
+    // Hide debug panel when returning to main menu
+    debugPanel.style.display = 'none';
+
+    // Ensure UI is back to main menu buttons
+    mainMenuButtons.style.display = 'flex';
+    joinRoomContainer.style.display = 'none';
+    roomCodeInput.value = '';
+
+    // If socket is open, make sure we stop any state sending
+    stopSendingState();
 }
 
 function startGame(){
     gameStarted = true;
     gameOver = false;
     waitingForFirstFlap = true;
+    pendingGameOver = false;
 
     startUI.style.display = 'none';
     gameOverUI.style.display = 'none';
@@ -182,16 +312,51 @@ function startGame(){
     frame = 0;
     score = 0;
     enemyScore = 0;
+    scoreLabel.textContent = score;
     enemyScoreLabel.textContent = enemyScore;
+    
+    // Disable Play Again until death is handled, specifically for MP mode.
+    // If not in a room, it remains enabled in resetGame().
+    if(roomCode) {
+        playAgainBtn.disabled = true; 
+    }
+
 
     bird.y = internalH/2;
     bird.vy = 0;
     bird.rot = 0;
     framesSinceLastPipe = 0;
+    
+    // Reset opponent's status for the new round
+    opponent.alive = true; 
+    opponent.score = 0; // Reset opponent's score for new round
+    
+    // Multiplayer Hook: Start sending state if in a room
+    if(socket && socket.readyState === WebSocket.OPEN && roomCode){
+        opponent.connected = true; 
+        startSendingState();
+        // The panel is made visible on 'open'. Re-enforce it here.
+        debugPanel.style.display = 'block'; 
+    } else {
+        // Single Player Mode - No roomCode
+        debugPanel.style.display = 'none';
+        // The playAgainBtn is already enabled from resetGame for local mode
+    }
 }
 
 function flap(){
-    if(!gameStarted) startGame();
+    // FIX: Prevent accidental start of a local game (by a click/space) 
+    // when the player is in an MP lobby waiting for the owner/opponent.
+    if(!gameStarted) {
+        if (roomCode) {
+            // If in a room, prevent local start on click/space
+            roomDisplay.textContent = isOwner ? 'Waiting for opponent to join ' + roomCode : 'Waiting for owner to start the game...';
+            return;
+        } else {
+            // No roomCode, proceed with local start.
+            startGame();
+        }
+    }
 
     if(waitingForFirstFlap) waitingForFirstFlap = false;
 
@@ -200,59 +365,136 @@ function flap(){
         bird.flapTimer=6;
         if(audioUnlocked){ sndFlap.currentTime = 0; sndFlap.play().catch(()=>{}); }
     }
-    if(gameOver) startGame();
+    // Only allow restart in local game mode
+    if(gameOver && !roomCode) startGame(); 
 }
 
 document.addEventListener('keydown', e=>{if(e.code==='Space'||e.key===' '){e.preventDefault(); flap();}});
 canvas.addEventListener('pointerdown', e=>{e.preventDefault(); flap();},{passive:false});
 
-// ---------- FULL showGameOver function ----------
-function showGameOver(){
-  if(score>highScore){highScore=score; localStorage.setItem('flappy_high',highScore);}
-  finalScore.textContent = score;
-  finalHigh.textContent = highScore;
-  homeHighScoreNum.textContent = highScore;
+let pendingGameOver = false; // true if we died but waiting for opponent to finish
 
-  // Remove existing hit points display if it exists
-  const existingHit = gameOverUI.querySelector('#enemyHitPointsDisplay');
-  if(existingHit) existingHit.remove();
-
-  // Add enemy bird hit points display above buttons
-  const enemyHitPointsDisplay = document.createElement('div');
-  enemyHitPointsDisplay.id = 'enemyHitPointsDisplay';
-  enemyHitPointsDisplay.style.marginTop = '8px';
-  enemyHitPointsDisplay.style.fontSize = '18px';
-  enemyHitPointsDisplay.textContent = "Bird Hit Points: " + enemyScore;
-
-  // Get the container that holds the buttons
-  const buttonContainer = gameOverUI.querySelector('div > div[style*="display:flex;gap:10px"]');
-  buttonContainer.parentElement.insertBefore(enemyHitPointsDisplay, buttonContainer);
-
-  gameOverUI.style.display='flex'; 
-  scoreLabel.parentElement.style.display='none';
-  
-  try{ 
-      if(audioUnlocked){ sndHitPipe.currentTime=0; sndHitPipe.play().catch(()=>{}); }
-      sndHit.currentTime=0; sndHit.play(); 
-  }catch(e){}
+// Function to handle the final display of scores and winner
+function finalizeMultiplayerResults() {
+    opponentResultBox.style.display = 'block';
+    opponentFinalScoreEl.textContent = opponent.score;
+    opponentFinalEnemyScoreEl.textContent = opponent.enemyScore;
+    waitingMessageEl.style.display = 'none';
+    
+    // Determine Winner based on pipe score
+    winnerMessageEl.style.display = 'block';
+    if (score > opponent.score) {
+        winnerMessageEl.textContent = "YOU WIN! (Score: " + score + " vs " + opponent.score + ")";
+    } else if (score < opponent.score) {
+        winnerMessageEl.textContent = "OPPONENT WINS! (Score: " + opponent.score + " vs " + score + ")";
+    } else {
+        winnerMessageEl.textContent = "IT'S A TIE! (Score: " + score + ")";
+    }
+    
+    // Enable Play Again button after results are displayed
+    playAgainBtn.disabled = false;
+    
+    // Ensure Game Over UI is visible (in case it was just showing the waiting screen)
+    gameOverUI.style.display='flex';
 }
 
+function showGameOver(){
+    if(gameOver) return; // Prevent double-triggering
+    gameOver=true; 
+    gameStarted=false;
+    
+    // FIX: Play the crash sounds immediately when the local player dies.
+    try{
+        if(audioUnlocked){ sndHitPipe.currentTime=0; sndHitPipe.play().catch(()=>{}); }
+        sndHit.currentTime=0; sndHit.play();
+    }catch(e){}
+    
+    // Check if we are in an active room
+    const inActiveRoom = socket && socket.readyState === WebSocket.OPEN && roomCode;
 
+    // 1. Update High Score (Local Player)
+    if(score>highScore){highScore=score; localStorage.setItem('flappy_high',highScore);}
+
+    // 2. Set Local Player Results
+    finalScoreEl.textContent = score;
+    finalHighEl.textContent = highScore;
+    finalEnemyScoreEl.textContent = enemyScore;
+    
+    // 3. Handle Multiplayer Logic
+    if(inActiveRoom){
+        console.log(`[MP DEBUG] Local Player died. Opponent connected: ${opponent.connected}, Opponent alive status: ${opponent.alive}`); 
+        
+        stopSendingState();
+        playAgainBtn.disabled = true; // Disable until final result is known
+
+        // Send final state (alive=false) to server
+        try{
+            socket.send(JSON.stringify({
+                type:'playerUpdate',
+                state:{alive:false, score:score, enemyScore:enemyScore, x:bird.x, y:bird.y, rot:bird.rot},
+                code:roomCode
+            }));
+        }catch(e){}
+
+        // FINAL FIX: Check opponent.alive. We MUST wait if the opponent is still flying.
+        if(opponent.alive){
+            pendingGameOver = true;
+            gameOverUI.style.display='flex';
+            scoreLabel.parentElement.style.display='none';
+            waitingMessageEl.style.display = 'block'; // SHOW THE WAITING MESSAGE
+            winnerMessageEl.style.display = 'none';
+            opponentResultBox.style.display = 'none';
+            return; // Exit here, wait for opponentUpdate
+        } else {
+             // Opponent is dead or was never connected, finalize immediately.
+             if (!opponent.connected) {
+                 opponent.score = 0;
+                 opponent.enemyScore = 0;
+             }
+             finalizeMultiplayerResults();
+        }
+    } else {
+        // Single Player Mode - finalize immediately
+        opponentResultBox.style.display = 'none';
+        winnerMessageEl.style.display = 'none';
+        playAgainBtn.disabled = false;
+    }
+    
+    // 4. Show the Game Over UI (if not waiting in MP)
+    if(!pendingGameOver){
+        gameOverUI.style.display='flex';
+        scoreLabel.parentElement.style.display='none';
+    }
+}
 // ---------- UPDATE FUNCTION ----------
 function update(dt){
     frame++;
+
+    // Update debug panel state
+    if(roomCode) {
+        debugGO.textContent = gameOver;
+        debugPending.textContent = pendingGameOver;
+        debugOppAlive.textContent = opponent.alive;
+        debugOppConnected.textContent = opponent.connected;
+    }
+
 
     cloudsA.forEach(c=>{c.x-=c.speed*dt;if(c.x<-200)c.x=internalW+200;});
     cloudsB.forEach(c=>{c.x-=c.speed*dt;if(c.x<-300)c.x=internalW+300;});
 
     if(!gameStarted || gameOver || waitingForFirstFlap){
+        // In menu/game over, make the bird gently float up and down
         bird.flapTimer=Math.max(0,bird.flapTimer-dt);
-        bird.vy = Math.sin(frame*0.15) * 1.2;
+        // Corrected calculation for floating animation based on frame
+        const floatSpeed = 0.012; // Slower floating
+        const floatAmplitude = 1.2;
+        bird.vy = Math.sin(frame * floatSpeed) * floatAmplitude;
         bird.y += bird.vy * dt;
-        bird.rot = Math.sin(frame*0.12) * 0.25;
+        bird.rot = Math.sin(frame * floatSpeed * 0.8) * 0.25; // Slight rotation
         return;
     }
 
+    // Game is active
     bird.vy+=GRAVITY*dt; bird.y+=bird.vy*dt; bird.rot=Math.max(-0.6,Math.min(0.9,bird.vy*0.06));
 
     framesSinceLastPipe++;
@@ -273,7 +515,7 @@ function update(dt){
         e.y+=Math.sin(frame*e.verticalFreq+i)*e.verticalAmp*dt*0.1;
 
         if(bird.x<e.x+e.w && bird.x+bird.w>e.x && bird.y<e.y+e.h && bird.y+bird.h>e.y){
-            // ⭐ Increase enemy points and remove enemy
+            // ⭐ Increase enemy points and remove enemy (Hit Points)
             enemyScore += e.golden ? 50 : 10;
             enemyScoreLabel.textContent = enemyScore;
             enemies.splice(i,1);
@@ -282,17 +524,21 @@ function update(dt){
 
         if(e.x<-80) enemies.splice(i,1);
     }
-
-    for(const p of pipes){
-        if(bird.x<p.x+p.w && bird.x+bird.w>p.x){
-            if(bird.y<p.top||bird.y+bird.h>internalH-p.bottom){
-                gameOver=true; gameStarted=false; showGameOver();
+    
+    // Do collision checks only if we are still alive
+    if (!gameOver) {
+        for(const p of pipes){
+            if(bird.x<p.x+p.w && bird.x+bird.w>p.x){
+                if(bird.y<p.top||bird.y+bird.h>internalH-p.bottom){
+                    showGameOver();
+                    return; // Exit update loop immediately after dying
+                }
             }
         }
-    }
 
-    if(bird.y+bird.h>=internalH || bird.y<=0){
-        gameOver=true; gameStarted=false; showGameOver();
+        if(bird.y+bird.h>=internalH || bird.y<=0){
+            showGameOver();
+        }
     }
 }
 
@@ -380,17 +626,6 @@ function draw(){
     for(const p of pipes) drawPipe(p.x,0,p.w,p.top,true), drawPipe(p.x,internalH-p.bottom,p.w,p.bottom,false);
     for(const e of enemies) drawEnemy(e);
 
-    // Draw opponent if connected
-    if(opponent && opponent.connected){
-        // draw opponent bird slightly translucent
-        ctx.save();
-        ctx.globalAlpha = 0.95;
-        drawBird(opponent.x + opponent.w*0.5, opponent.y + opponent.h*0.5, opponent.w, opponent.h, opponent.rot);
-        // small label
-        ctx.globalAlpha = 1;
-        ctx.restore();
-    }
-
     ctx.save(); ctx.translate(bird.x+bird.w*0.5,bird.y+bird.h*0.5); ctx.rotate(bird.rot);
     ctx.globalAlpha=0.12;
     ctx.beginPath(); ctx.ellipse(0,36,bird.w*0.7,8,0,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
@@ -400,23 +635,21 @@ function draw(){
 }
 
 /* -------------------------
-   End of original game code
-   ------------------------- */
-
-/* -------------------------
-   Multiplayer client code (hooks + safe checks)
-   ------------------------- */
+    Multiplayer client code (hooks + safe checks)
+    ------------------------- */
 
 // Opponent object to render other player's bird and stats
-let opponent = {connected:false, x:80, y:300, w:40, h:32, rot:0, score:0, enemyScore:0, alive:true};
+// Set initial X position off-screen
+let opponent = {connected:false, x:-100, y:300, w:40, h:32, rot:0, score:0, enemyScore:0, alive:true};
 
 // UI elements for multiplayer status & room display
 const mpStatusEl = document.getElementById('mpStatus');
 const mpPanel = document.getElementById('multiplayerStatus');
 const roomDisplay = document.getElementById('roomCodeDisplay');
 
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const serverUrl = 'wss://flappymulti.onrender.com';
 let socket = null;
-let clientId = null;
 let roomCode = null;
 let isOwner = false;
 let sendIntervalId = null;
@@ -424,10 +657,16 @@ let sendIntervalId = null;
 // safe wrapper to create a socket and attach handlers
 function connectSocket(){
     try{
-        socket = new WebSocket('wss://flappymulti.onrender.com');
+        // Use the public WSS URL for production, or localhost for local testing
+        const connectionURL = isLocalhost ? "ws://localhost:8080" : serverUrl;
+        
+        socket = new WebSocket(connectionURL); 
+        console.log(`Attempting connection to: ${connectionURL}`); // Add this log to confirm
+        
     }catch(e){
         socket = null;
         console.warn('WebSocket construct failed', e);
+        roomDisplay.textContent = 'Connection failed. Server unavailable.';
         return;
     }
 
@@ -435,6 +674,8 @@ function connectSocket(){
         console.log('Connected to WebSocket server');
         mpPanel.style.display = 'block';
         mpStatusEl.textContent = 'connected';
+        // ⭐ FIX APPLIED HERE: Show debug panel immediately upon successful WebSocket connection
+        debugPanel.style.display = 'block'; 
     });
 
     socket.addEventListener('message', (ev)=>{
@@ -442,61 +683,105 @@ function connectSocket(){
         try{ data = JSON.parse(ev.data); }catch(e){ return; }
 
         // handle server messages
-        if(data.type === 'roomCreated'){
+       if(data.type === 'roomCreated'){
             roomCode = data.code;
             isOwner = true;
-            roomDisplay.textContent = 'Room: ' + roomCode + ' (owner)';
-            // owner shouldn't start until someone joins
-            startMainBtn.disabled = true;
+            // When the room is created, the OPPONENT is not connected yet, but the debug panel needs to be initialized.
+            opponent.connected = false; 
+            opponent.alive = true;
+            roomDisplay.textContent = 'Room Code: ' + roomCode;
+            // The panel is already visible from the 'open' handler, but we keep this as redundancy.
+            debugPanel.style.display = 'block'; 
+            mainMenuButtons.style.display = 'flex';
         }
 
         if(data.type === 'playerJoined'){
-            // other player joined the owner's room
-            if(isOwner){
-                startMainBtn.disabled = false;
-                roomDisplay.textContent = 'Room: ' + roomCode + ' (player joined)';
-                alert('Player joined your room — you can now start multiplayer.');
-            }
+            opponent.connected = true;
+            opponent.alive = true; // Opponent is guaranteed alive when they first join
+            roomDisplay.textContent = 'Room: ' + data.code + ' (Opponent ready)';
+            startMainBtn.disabled = false;
         }
 
         if(data.type === 'startGame'){
-            // server instructs to start
+            // Server instructs to start the game
             startUI.style.display = 'none';
+            // Reset the opponent's 'alive' status for the new round
+            opponent.alive = true; 
             startGame();
         }
 
         if(data.type === 'roomJoined'){
-            // joined successfully
             roomCode = data.code;
-            roomDisplay.textContent = 'Room: ' + roomCode + ' (joined)';
-            // joined player can start (we enable start for joined)
-            startMainBtn.disabled = false;
+            opponent.connected = true; 
+            opponent.alive = true;
+            roomDisplay.textContent = 'Room: ' + roomCode + ' (Waiting for owner to start)';
+            startMainBtn.disabled = true;
+            
+            // The panel is already visible from the 'open' handler, but we keep this as redundancy.
+            debugPanel.style.display = 'block'; 
+
+            mainMenuButtons.style.display = 'flex';
+            joinRoomContainer.style.display = 'none';
+            roomCodeInput.value = '';
+        }
+        if(data.type === 'opponentUpdate'){
+            const s = data.state || {};
+            opponent.connected = true;
+            
+            // 1. Update opponent's state
+            opponent.x = (typeof s.x === 'number') ? s.x : opponent.x;
+            opponent.y = (typeof s.y === 'number') ? s.y : opponent.y;
+            opponent.rot = (typeof s.rot === 'number') ? s.rot : opponent.rot;
+            opponent.score = (typeof s.score === 'number') ? s.score : opponent.score;
+            opponent.enemyScore = (typeof s.enemyScore === 'number') ? s.enemyScore : opponent.enemyScore;
+            
+            const wasAlive = opponent.alive;
+            opponent.alive = (typeof s.alive === 'boolean') ? s.alive : opponent.alive;
+            
+            console.log(`[MP DEBUG] Received Opponent Update. Alive: ${opponent.alive}, Connected: ${opponent.connected}, Score: ${opponent.score}`);
+
+            // 2. Synchronization Check: Did the opponent just die?
+            if (gameOver && pendingGameOver && !opponent.alive) {
+                // We were waiting (pendingGameOver=true) and the opponent's dead status just arrived
+                pendingGameOver = false;
+                finalizeMultiplayerResults();
+            }
+            
+            // 3. Inform the player if the opponent died first
+            if (!gameOver && wasAlive && !opponent.alive) {
+                roomDisplay.textContent = 'Opponent has crashed! Finish the race!';
+            }
         }
 
-        if(data.type === 'opponentUpdate'){
-    const s = data.state || {};
-    opponent.connected = true;
-    opponent.x = (typeof s.x === 'number') ? s.x : opponent.x;
-    opponent.y = (typeof s.y === 'number') ? s.y : opponent.y;
-    opponent.rot = (typeof s.rot === 'number') ? s.rot : opponent.rot;
-    opponent.score = (typeof s.score === 'number') ? s.score : opponent.score;
-    opponent.enemyScore = (typeof s.enemyScore === 'number') ? s.enemyScore : opponent.enemyScore;
-    opponent.alive = (typeof s.alive === 'boolean') ? s.alive : opponent.alive;
-
-    // NEW: show game over only when both players are dead
-    if(!opponent.alive && gameOver) {
-        displayMultiplayerGameOver();
-    }
-}
         if(data.type === 'opponentLeft'){
             opponent.connected = false;
             opponent.alive = false;
-            roomDisplay.textContent = 'Room: ' + (roomCode || '') + ' (opponent left)';
-            alert('Opponent left the room.');
+            roomDisplay.textContent = 'Room: ' + (roomCode || '') + ' (Opponent disconnected)';
+            
+            // If the opponent leaves while we are waiting, finalize results immediately
+            if(pendingGameOver){
+                pendingGameOver = false;
+                // Set opponent's score to 0 since they disconnected early.
+                opponent.score = 0; 
+                opponent.enemyScore = 0;
+                finalizeMultiplayerResults();
+            }
+            
+            // If the local player is still in the main menu after room creation/join, 
+            // and the opponent leaves, re-enable the Start button if they are the owner.
+            if (!gameStarted && !gameOver && isOwner) {
+                startMainBtn.disabled = false;
+            }
         }
 
         if(data.type === 'error'){
-            alert('Server: ' + (data.message||'error'));
+            console.error('Server Error: ', data.message);
+            roomDisplay.textContent = 'Error: ' + (data.message||'Unknown');
+            mainMenuButtons.style.display = 'flex';
+            joinRoomContainer.style.display = 'none';
+            roomCodeInput.value = '';
+            // Clear roomCode on error from server
+            roomCode = null;
         }
     });
 
@@ -504,12 +789,30 @@ function connectSocket(){
         console.log('Socket closed');
         mpStatusEl.textContent = 'disconnected';
         opponent.connected = false;
+        debugPanel.style.display = 'none';
+        
+        // ⭐ FINAL DIAGNOSTIC FIX: Better feedback for immediate connection loss
+        // Check if we were actively waiting for a room confirmation
+        if (roomDisplay.textContent.startsWith('Attempting to join room') || roomDisplay.textContent.startsWith('Room Code:')) {
+            roomDisplay.textContent = 'Connection failed. Possible causes: Room not found, server unreachable, or join error. Try again.';
+        } else if (roomCode) {
+            // Active game loss (less likely for this error, but for completeness)
+            roomDisplay.textContent = 'Active game connection lost. Try Main Menu.';
+        } else {
+            roomDisplay.textContent = 'Connection closed.';
+        }
+        
+        roomCode = null; // Ensure roomCode is reset on any socket close
+        
         if(sendIntervalId) { clearInterval(sendIntervalId); sendIntervalId = null; }
     });
 
     socket.addEventListener('error', (e)=>{
         console.warn('Socket error', e);
         mpStatusEl.textContent = 'error';
+        debugPanel.style.display = 'none';
+        roomDisplay.textContent = 'A critical connection error occurred.';
+        roomCode = null;
     });
 }
 
@@ -526,8 +829,8 @@ function startSendingState(){
                 y: bird.y,
                 rot: bird.rot,
                 score: score,
-                enemyScore: enemyScore,
-                alive: !gameOver
+                enemyScore: enemyScore, 
+                alive: !gameOver 
             },
             code: roomCode || null
         };
@@ -544,109 +847,161 @@ function stopSendingState(){
 document.getElementById('createRoomBtn').addEventListener('click', ()=>{
     if(!socket || socket.readyState !== WebSocket.OPEN){
         connectSocket();
-        // wait briefly for open before sending create; fallback: attempt send after open
-        socket.addEventListener('open', ()=>{ try{ socket.send(JSON.stringify({type:'createRoom'})); }catch(e){} }, {once:true});
+        socket.addEventListener('open', ()=>{
+            if(socket && socket.readyState === WebSocket.OPEN) {
+                try{ socket.send(JSON.stringify({type:'createRoom'})); }catch(e){}
+            }
+        }, {once:true});
     }else{
         try{ socket.send(JSON.stringify({type:'createRoom'})); }catch(e){}
     }
 });
 
-// join room button
+// Join Room Button (Toggles UI)
 document.getElementById('joinRoomBtn').addEventListener('click', ()=>{
-    const code = prompt('Enter room code:');
-    if(!code) return;
+    mainMenuButtons.style.display = 'none';
+    joinRoomContainer.style.display = 'flex';
+    roomCodeInput.focus();
+    roomCodeInput.value = ''; 
+});
+
+// Submit Join Button (Sends Request)
+submitJoinBtn.addEventListener('click', ()=>{
+    const code = roomCodeInput.value.trim().toUpperCase();
+    if (code.length < 4) {
+        roomDisplay.textContent = 'Please enter a 4-character code.';
+        return;
+    }
+    
+    roomDisplay.textContent = 'Attempting to join room ' + code + '...';
+
+    const sendJoinRequest = (joinCode) => {
+        try {
+            socket.send(JSON.stringify({ type: 'joinRoom', code: joinCode }));
+        } catch(e) {
+            console.error("Error sending join request:", e);
+            roomDisplay.textContent = 'Error sending request. Try again.';
+        }
+    };
+
     if(!socket || socket.readyState !== WebSocket.OPEN){
         connectSocket();
-        socket.addEventListener('open', ()=>{ try{ socket.send(JSON.stringify({type:'joinRoom', code})); }catch(e){} }, {once:true});
-    }else{
-        try{ socket.send(JSON.stringify({type:'joinRoom', code})); }catch(e){}
+        socket.addEventListener('open', ()=>{
+            if(socket && socket.readyState === WebSocket.OPEN) {
+                sendJoinRequest(code);
+            }
+        }, {once:true});
+    } else {
+        sendJoinRequest(code);
     }
 });
 
-// start button override to support multiplayer start messaging
-startMainBtn.addEventListener('click', ()=>{
-    // if connected and in a room, send start request to server; otherwise local start
-    if(socket && socket.readyState === WebSocket.OPEN && roomCode){
+// Cancel Join Button (Hides Input)
+cancelJoinBtn.addEventListener('click', ()=>{
+    mainMenuButtons.style.display = 'flex';
+    joinRoomContainer.style.display = 'none';
+    roomCodeInput.value = '';
+    roomDisplay.textContent = '';
+});
+
+
+// start button override for multiplayer
+startMainBtn.addEventListener('click', (e)=>{
+    // If not in a room, start local game immediately
+    if(!socket || socket.readyState !== WebSocket.OPEN || !roomCode || !opponent.connected) {
+        if(roomCode && !opponent.connected){
+            roomDisplay.textContent = 'Waiting for opponent to join ' + roomCode;
+            e.preventDefault();
+            return;
+        }
+        startGame();
+        return;
+    }
+
+    // If in a room, only the owner can trigger the global start
+    if(isOwner){
         try{ socket.send(JSON.stringify({type:'startGame', code: roomCode})); }catch(e){}
     } else {
-        startGame();
+        e.preventDefault();
+        roomDisplay.textContent = 'Waiting for owner to start the game...';
     }
 });
-
-// When we actually start (either via startGame or server), begin sending state
-// We'll hook into the startGame function behavior by wrapping startGame with a small helper:
-const originalStartGame = startGame;
-startGame = function(){
-    originalStartGame();
-    // if connected to server and in a room, start sending our state
-    if(socket && socket.readyState === WebSocket.OPEN && roomCode){
-        startSendingState();
-    }
-};
-
-// When game over, send one final state (alive=false) then stop sending
-// -------------------- Multiplayer sync for both players dying --------------------
-let pendingGameOver = false; // true if we died but waiting for opponent
-
-const originalShowGameOver = showGameOver;
-showGameOver = function(){
-    if(socket && socket.readyState === WebSocket.OPEN && roomCode && opponent.connected){
-        // Send our alive=false state to server
-        try{
-            socket.send(JSON.stringify({
-                type:'playerUpdate',
-                state:{alive:false, score:score, enemyScore:enemyScore},
-                code:roomCode
-            }));
-        }catch(e){}
-        stopSendingState();
-
-        // Mark that we're waiting for opponent if they are still alive
-        if(opponent.alive){
-            pendingGameOver = true;
-            return; // don't show UI yet
-        }
-    }
-
-    // If opponent already dead or single-player, show immediately
-    originalShowGameOver();
-
-    // Show both scores if multiplayer
-    if(opponent.connected){
-        const enemyHitPointsDisplay = gameOverUI.querySelector('#enemyHitPointsDisplay');
-        if(enemyHitPointsDisplay){
-            enemyHitPointsDisplay.textContent = `Opponent Score: ${opponent.score}`;
-        }
-    }
-};
 
 // Also, when leaving (click Main Menu), tell server we're leaving the room
 goHomeBtn.addEventListener('click', ()=>{
     if(socket && socket.readyState === WebSocket.OPEN && roomCode){
         try{ socket.send(JSON.stringify({type:'leaveRoom', code: roomCode})); }catch(e){}
     }
+    resetGame();
 });
 
-// When page unload, close socket
-window.addEventListener('beforeunload', ()=>{
-    try{ if(socket) socket.close(); }catch(e){}
+// Play Again button handler - sends request to server to start new round
+playAgainBtn.addEventListener('click', ()=>{
+    if(roomCode && socket && socket.readyState === WebSocket.OPEN){
+        if(isOwner) {
+            try{ socket.send(JSON.stringify({type:'startGame', code: roomCode})); }catch(e){}
+        } else {
+            // Non-owner waits for the owner to start
+            gameOverUI.style.display = 'none';
+            waitingMessageEl.style.display = 'block';
+            waitingMessageEl.textContent = 'Waiting for room owner to start the next round...';
+            playAgainBtn.disabled = true;
+        }
+    } else {
+        // Local Game restart
+        startGame(); 
+    }
+});
+startMainBtn.addEventListener('click', (e)=>{
+    // If not in a room, start local game immediately
+    if(!socket || socket.readyState !== WebSocket.OPEN || !roomCode || !opponent.connected) {
+        if(roomCode && !opponent.connected){
+            roomDisplay.textContent = 'Waiting for opponent to join ' + roomCode;
+            e.preventDefault();
+            return;
+        }
+        startGame();
+        return;
+    }
+
+    // If in a room, only the owner can trigger the global start
+    if(isOwner){
+        try{ socket.send(JSON.stringify({type:'startGame', code: roomCode})); }catch(e){}
+    } else {
+        e.preventDefault();
+        roomDisplay.textContent = 'Waiting for owner to start the game...';
+    }
+});
+
+// Also, when leaving (click Main Menu), tell server we're leaving the room
+goHomeBtn.addEventListener('click', ()=>{
+    if(socket && socket.readyState === WebSocket.OPEN && roomCode){
+        try{ socket.send(JSON.stringify({type:'leaveRoom', code: roomCode})); }catch(e){}
+    }
+    resetGame();
+});
+
+// Play Again button handler - sends request to server to start new round
+playAgainBtn.addEventListener('click', ()=>{
+    if(roomCode && socket && socket.readyState === WebSocket.OPEN){
+        if(isOwner) {
+            try{ socket.send(JSON.stringify({type:'startGame', code: roomCode})); }catch(e){}
+        } else {
+            // Non-owner waits for the owner to start
+            gameOverUI.style.display = 'none';
+            waitingMessageEl.style.display = 'block';
+            waitingMessageEl.textContent = 'Waiting for room owner to start the next round...';
+            playAgainBtn.disabled = true;
+        }
+    } else {
+        // Local Game restart
+        startGame(); 
+    }
 });
 
 /* -------------------------
-  NOTES about server protocol (for your server)
-  - createRoom -> server responds {type:'roomCreated', code}
-  - joinRoom -> server responds {type:'roomJoined', code} or {type:'error', message}
-  - when second player joins, server should broadcast {type:'playerJoined'} to owner
-  - startGame -> server should broadcast {type:'startGame'} to both participants
-  - playerUpdate -> client sends {type:'playerUpdate', state:{x,y,rot,score,enemyScore,alive}, code}
-        server should forward {type:'opponentUpdate', state:...} to the other player
-  - leaveRoom -> server notifies the other player {type:'opponentLeft'}
-  ------------------------- */
-
-/* -------------------------
-   Frame loop + start game initialization (already present earlier)
-   We already attached original listeners earlier; ensure resize/reset/loop run
-   ------------------------- */
+    Frame loop + start game initialization (already present earlier)
+    ------------------------- */
 
 let lastTime = performance.now();
 function frameLoop(time){
@@ -661,12 +1016,6 @@ function frameLoop(time){
 requestAnimationFrame(frameLoop);
 
 resize(); resetGame();
-
-// Keep original playAgain and goHome behaviors intact (already set earlier)
-playAgainBtn.addEventListener('click', ()=>{ startGame(); });
-goHomeBtn.addEventListener('click', ()=>{ resetGame(); });
-
 </script>
 </body>
-</html>
-
+</html> 
