@@ -252,14 +252,18 @@ function generatePipe(){
         const isGolden = Math.random()<0.1; // 10% chance
         enemies.push({x:pipe.x+10,y:enemyY,w:32,h:24,speed:3+Math.random()*1,verticalAmp:12+Math.random()*8,verticalFreq:0.05+Math.random()*0.05, golden:isGolden});
     }
-const cssWidth = parseInt(canvas.style.width || internalW, 10);
-// Set the base frame count much higher for small screens.
-// 250 frames is over 4 seconds of time between pipes at a base speed of 2.
-const base = cssWidth <= 400 ? 200: 80;
-nextPipeIn = base + Math.floor(Math.random() * 60);
-framesSinceLastPipe = 0;
+    
+    // --- START OF CORRECTION ---
+    // Use a fixed frame count range to ensure consistent pipe distance on all devices.
+    // Base is set to 80 frames (~1.3 seconds), with a random variation of up to 60 frames.
+    const baseFrameCount = 80; 
+    const maxVariation = 60;
+    
+    nextPipeIn = baseFrameCount + Math.floor(Math.random() * maxVariation);
+    // --- END OF CORRECTION ---
+    
+    framesSinceLastPipe = 0;
 }
-
 function resetGame(){
     gameStarted=false; gameOver=false; pipes=[]; enemies=[]; frame=0; score=0; enemyScore=0;
     waitingForFirstFlap = false;
@@ -1020,19 +1024,3 @@ resize(); resetGame();
 </script>
 </body>
 </html> 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
