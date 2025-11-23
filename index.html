@@ -255,7 +255,7 @@ function generatePipe(){
 const cssWidth = parseInt(canvas.style.width || internalW, 10);
 // Set the base frame count much higher for small screens.
 // 250 frames is over 4 seconds of time between pipes at a base speed of 2.
-const base = cssWidth <= 400 ? 200: 60;
+const base = cssWidth <= 400 ? 200: 80;
 nextPipeIn = base + Math.floor(Math.random() * 60);
 framesSinceLastPipe = 0;
 }
@@ -1020,6 +1020,7 @@ resize(); resetGame();
 </script>
 </body>
 </html> 
+
 
 
 
