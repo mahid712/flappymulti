@@ -92,6 +92,11 @@ canvas{border-radius:18px;box-shadow:var(--shadow);background: linear-gradient(1
 @media (max-width:480px){
   #titleLarge{font-size:44px}
   .btn{padding:8px 10px}
+  /* --- FIX: Reduce score font size on small screens and re-enforce nowrap --- */
+  #scoreLabel{
+    font-size: 16px;
+    white-space: nowrap;
+  }
 }
 </style>
 </head>
@@ -1024,4 +1029,3 @@ resize(); resetGame();
 </script>
 </body>
 </html> 
-
