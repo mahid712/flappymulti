@@ -97,6 +97,10 @@ canvas{border-radius:18px;box-shadow:var(--shadow);background: linear-gradient(1
     font-size: 16px;
     white-space: nowrap;
   }
+  /* --- NEW FIX: Hide Debug Panel on Mobile Screens --- */
+  #debugPanel {
+    display: none !important;
+  }
 }
 </style>
 </head>
@@ -1029,4 +1033,5 @@ resize(); resetGame();
 </script>
 </body>
 </html> 
+
 
