@@ -124,7 +124,7 @@ canvas{border-radius:18px;box-shadow:var(--shadow);background: linear-gradient(1
   <div id="startUI" class="overlay" style="display:flex;">
     <div style="display:flex;flex-direction:column;align-items:center;gap:20px;">
       <div id="titleLarge">FLAPPY BIRD</div>
-      <div id="subtitle">Premium UI • Competitive Multiplayer</div>
+      <div id="subtitle">Premium UI тАв Competitive Multiplayer</div>
       <div id="homeHighScore">High Score: <span id="homeHighScoreNum">0</span></div>
       
       <div id="mainMenuButtons" style="display:flex;flex-direction:column;align-items:center;gap:10px;">
@@ -227,6 +227,10 @@ let nextPipeIn=100;
 let highScore=parseInt(localStorage.getItem('flappy_high')||'0',10);
 homeHighScoreNum.textContent=highScore;
 
+// --- START OF NEW CODE: Floating Text Array ---
+let floatingTexts = [];
+// --- END OF NEW CODE ---
+
 function resize(){
     const padding = Math.min(window.innerWidth,24);
     const maxW = window.innerWidth - padding;
@@ -295,7 +299,7 @@ function resetGame(){
     opponentResultBox.style.display = 'none';
     waitingMessageEl.style.display = 'none';
     
-    // ⭐ FIX: Ensure Play Again is re-enabled on reset, it will be disabled again 
+    // тнР FIX: Ensure Play Again is re-enabled on reset, it will be disabled again 
     // in startGame() for MP games. This fixes local game restarts.
     playAgainBtn.disabled = false; 
     
@@ -309,6 +313,10 @@ function resetGame(){
 
     // If socket is open, make sure we stop any state sending
     stopSendingState();
+
+    // --- START OF NEW CODE: Reset Floating Texts ---
+    floatingTexts = [];
+    // --- END OF NEW CODE ---
 }
 
 function startGame(){
@@ -328,6 +336,10 @@ function startGame(){
     enemyScore = 0;
     scoreLabel.textContent = score;
     enemyScoreLabel.textContent = enemyScore;
+    
+    // --- START OF NEW CODE: Reset Floating Texts ---
+    floatingTexts = [];
+    // --- END OF NEW CODE ---
     
     // Disable Play Again until death is handled, specifically for MP mode.
     // If not in a room, it remains enabled in resetGame().
@@ -529,8 +541,24 @@ function update(dt){
         e.y+=Math.sin(frame*e.verticalFreq+i)*e.verticalAmp*dt*0.1;
 
         if(bird.x<e.x+e.w && bird.x+bird.w>e.x && bird.y<e.y+e.h && bird.y+bird.h>e.y){
-            // ⭐ Increase enemy points and remove enemy (Hit Points)
-            enemyScore += e.golden ? 50 : 10;
+            
+            // --- START OF MODIFIED COLLISION LOGIC ---
+            const points = e.golden ? 50 : 10;
+            
+            // 1. Create the floating text object
+            floatingTexts.push({
+                x: bird.x + bird.w * 0.5,
+                y: bird.y, // Start slightly above the bird
+                text: `+${points}`,
+                color: e.golden ? '#FFD700' : '#FF0000',
+                vy: -5.0, // Initial vertical velocity (rising)
+                life: 1.0, // Life in seconds (or frames, 1.0 = full life)
+                maxLife: 1.0 // Total duration in seconds (adjust for speed)
+            });
+            // --- END OF MODIFIED COLLISION LOGIC ---
+
+            // тнР Increase enemy points and remove enemy (Hit Points)
+            enemyScore += points;
             enemyScoreLabel.textContent = enemyScore;
             enemies.splice(i,1);
             continue;
@@ -538,6 +566,17 @@ function update(dt){
 
         if(e.x<-80) enemies.splice(i,1);
     }
+    
+    // --- START OF NEW CODE: Update Floating Texts ---
+    for(let i=floatingTexts.length-1; i>=0; i--){
+        const t = floatingTexts[i];
+        t.y += t.vy * dt * 0.12; // Move up, scaled by dt
+        t.vy += 0.01 * dt; // Slow down the rise slightly
+        t.life -= 0.02 * dt; // Decrease life
+
+        if(t.life <= 0) floatingTexts.splice(i, 1); // Remove when life is over
+    }
+    // --- END OF NEW CODE ---
     
     // Do collision checks only if we are still alive
     if (!gameOver) {
@@ -625,6 +664,22 @@ function drawPipe(x,y,w,h,isTop){
     ctx.fillRect(x+w-8,y+4,8,h-8);
 }
 
+// --- START OF NEW CODE: Draw Floating Text Function ---
+function drawFloatingText(t){
+    const alpha = Math.max(0, t.life / t.maxLife); // Fade out as life decreases
+    ctx.globalAlpha = alpha;
+    ctx.font = '700 24px Inter, sans-serif';
+    ctx.fillStyle = t.color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 4;
+    ctx.fillText(t.text, t.x, t.y);
+    ctx.shadowBlur = 0; // Reset shadow
+    ctx.globalAlpha = 1; // Reset global alpha
+}
+// --- END OF NEW CODE ---
+
 function draw(){
     const g=ctx.createLinearGradient(0,0,0,internalH);
     g.addColorStop(0,'#70c5ce');
@@ -646,6 +701,10 @@ function draw(){
     ctx.globalAlpha=1; ctx.restore();
 
     drawBird(bird.x+bird.w*0.5,bird.y+bird.h*0.5,bird.w,bird.h,bird.rot);
+    
+    // --- START OF NEW CODE: Draw Floating Texts ---
+    for(const t of floatingTexts) drawFloatingText(t);
+    // --- END OF NEW CODE ---
 }
 
 /* -------------------------
@@ -689,7 +748,7 @@ function connectSocket(){
         console.log('Connected to WebSocket server');
         mpPanel.style.display = 'block';
         mpStatusEl.textContent = 'connected';
-        // ⭐ FIX APPLIED HERE: Show debug panel immediately upon successful WebSocket connection
+        // тнР FIX APPLIED HERE: Show debug panel immediately upon successful WebSocket connection
         debugPanel.style.display = 'block'; 
     });
 
@@ -806,7 +865,7 @@ function connectSocket(){
         opponent.connected = false;
         debugPanel.style.display = 'none';
         
-        // ⭐ FINAL DIAGNOSTIC FIX: Better feedback for immediate connection loss
+        // тнР FINAL DIAGNOSTIC FIX: Better feedback for immediate connection loss
         // Check if we were actively waiting for a room confirmation
         if (roomDisplay.textContent.startsWith('Attempting to join room') || roomDisplay.textContent.startsWith('Room Code:')) {
             roomDisplay.textContent = 'Connection failed. Possible causes: Room not found, server unreachable, or join error. Try again.';
@@ -1033,6 +1092,4 @@ requestAnimationFrame(frameLoop);
 resize(); resetGame();
 </script>
 </body>
-</html> 
-
-
+</html>
