@@ -672,7 +672,8 @@ let sendIntervalId = null;
 function connectSocket(){
     try{
         // Use the public WSS URL for production, or localhost for local testing
-        const connectionURL = isLocalhost ? "ws://localhost:8080" : serverUrl;
+        // AFTER (Forces Render connection, even on Live Server):
+        const connectionURL = serverUrl;
         
         socket = new WebSocket(connectionURL); 
         console.log(`Attempting connection to: ${connectionURL}`); // Add this log to confirm
@@ -1033,6 +1034,5 @@ resize(); resetGame();
 </script>
 </body>
 </html> 
-
 
 
