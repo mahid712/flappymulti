@@ -730,9 +730,8 @@ let sendIntervalId = null;
 // safe wrapper to create a socket and attach handlers
 function connectSocket(){
     try{
-        // Use the public WSS URL for production, or localhost for local testing
-        // AFTER (Forces Render connection, even on Live Server):
-        const connectionURL = serverUrl;
+        // Use the local WebSocket server during local development.
+        const connectionURL = isLocalhost ? 'ws://localhost:8080' : serverUrl;
         
         socket = new WebSocket(connectionURL); 
         console.log(`Attempting connection to: ${connectionURL}`); // Add this log to confirm
